@@ -145,7 +145,7 @@ NOTES:
 int bitXor(int x, int y) {
   //4: 0100  5: 0101
   //德摩根律
-  return ~((~x)&(~y))&(~(x &y));
+  return ~((~x)&(~y))&(~(x & y));
 }
 /* 
  * tmin - return minimum two's complement integer @two's-complement
@@ -172,10 +172,9 @@ int isTmax(int x) {
    * x = 0111
    * x + 1 = 1000 截断
    * ~(x+1) = 0111
-   * 
-   * -1 跑不通
+   * -1是特例
   */
-  return (~(x + 1) == x);
+  return (!((~(x+1)) ^ x)) & (!!((x+1) ^ 0x0));
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -186,7 +185,17 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  /**
+   * 奇数位全为1，偶数位全为0，32bit 从0开始
+   * 二分法
+   * 拆分来看 A = 1010 ; 逻辑右移 共计32bit
+  */
+  int A = 0XA;
+  int AA = A | (A << 4);
+  int AAA = AA | (AA << 8);
+  int all_a = AAA | (AAA << 16);
+
+  return !((x & all_a) ^ all_a);
 }
 /* 
  * negate - return -x 
@@ -196,7 +205,12 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+
+  /**
+   * 补码的定义
+   * a - b = a + (~b+1)
+  */
+  return (~x + 1);
 }
 //3
 /* 
@@ -209,7 +223,20 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  /**
+   * 做差并考虑溢出
+   * x + (~0x30+1) >= 0
+   * x + (~0x39+1) <= 0
+   * 同时满足
+   * 错误视角？！还是得从bit进行
+   * ! return boolean
+   * 从int到bool
+   * 运算符超出了
+  */
+  int a = 0x3 ^ (x >> 4);
+  int b = (0x9 + (~(x & 0xf) + 1)) >> 31;
+
+  return !a & !b; 
 }
 /* 
  * conditional - same as x ? y : z 
@@ -219,7 +246,16 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  /**
+   * 伪三目运算符
+   * 表达式 ？真 ： 假
+   * 0 False, !0 True
+  */
+
+  int sign = !(0x0 ^ x); //x>0, sign=0
+  int data = (~(sign+(~1+1)) & z) + (sign+(~1+1) & y);
+
+  return data;
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -229,7 +265,11 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  /**
+   * 直接判断两种情况之一
+  */
+  return !((y+(~x+1))>>31) | !(y ^ x);
+
 }
 //4
 /* 
@@ -241,7 +281,13 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  /**
+   * 逻辑非
+   * 符号位 或
+  */ 
+  int a = (x | (~x+1)) >> 31;
+  int b = (a & 0x1);
+  return 1 + (~b+1);
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -256,7 +302,34 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  /**
+   * 带上符号位
+   * 二分法
+  */
+  int isZero = !x;
+  int flag = x >> 31;
+  int mask = (((!!x) << 31) >> 31);
+  x = ((~flag) & x) | (flag & (~x));
+
+  int bit_16, bit_8, bit_4, bit_2, bit_1, bit_0;
+  bit_16 = (!((!!(x >> 16)) ^ (0x1))) << 4;
+  x >>= bit_16;
+
+  bit_8 = (!((!!(x >> 8)) ^ (0x1))) << 3;
+  x >>= bit_8;
+
+  bit_4 = (!((!!(x >> 4)) ^ (0x1))) << 2;
+  x >>= bit_4;
+
+  bit_2 = (!((!!(x >> 2)) ^ (0x1))) << 1;
+  x >>= bit_2;
+
+  bit_1 = (!((!!(x >> 1)) ^ (0x1)));
+  x >>= bit_1;
+
+  bit_0 = x;
+  int res = bit_16 + bit_8 + bit_4 + bit_2 + bit_1 + bit_0 + 1;
+  return isZero | (mask & res);
 }
 //float
 /* 
@@ -271,6 +344,15 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
+  /**
+   * 浮点数的表示 SME
+   * 分类讨论
+  */
+
+  unsigned int s = (uf >> 31) & 0x1;
+  unsigned int expr = (uf >> 23) & 0xff;
+  unsigned int frac = uf & 0x7fffff;
+
   return 2;
 }
 /* 

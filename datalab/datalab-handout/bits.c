@@ -347,13 +347,32 @@ unsigned floatScale2(unsigned uf) {
   /**
    * 浮点数的表示 SME
    * 分类讨论
+   * 非规格化的偏置值是固定的
   */
 
   unsigned int s = (uf >> 31) & 0x1;
-  unsigned int expr = (uf >> 23) & 0xff;
+  unsigned int expr = (uf >> 23) & 0xff;  //去掉frac，只取8位
   unsigned int frac = uf & 0x7fffff;
 
-  return 2;
+  //0
+  if (expr == 0 && frac == 0)
+    return uf;
+
+  //infinity or nor a number
+  if (expr == 0xff)
+    return uf;
+
+  //denormalize
+  if (expr == 0){
+    //int E = expr - 127;
+    //非规格化的expr全是0
+    frac <<= 1; //*2
+    return (s << 31) | frac;
+  }
+
+  //normalize
+  expr++;     //*2  expr+1
+  return (s << 31) | (expr << 23) | frac;
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -368,7 +387,52 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  /**
+   * float 转换为 unsigned int
+   * 分类讨论
+   * 非规格化的偏置值是固定的
+  */
+
+  unsigned int s = (uf >> 31) & 0x1;
+  unsigned int expr = (uf >> 23) & 0xff;
+  unsigned int frac = uf & 0x7fffff;
+
+  //0
+  if (expr == 0 && frac == 0)
+    return 0;
+  
+  //inf NaN
+  if (expr == 0xff)
+    return 1 << 31; //0x80000000u
+  
+  //denormalzie
+  if (expr == 0){
+    //M 0.111111 << 1
+    //E = 1 - 127 = -126
+    return 0;
+  }
+
+  //normalzie   expr 为unsigned int
+  int E = expr - 127;
+  frac = frac | (1 << 23);
+
+  if (E > 31){
+    //1.XXXXX
+    return 1 << 31;
+  }else if (E < 0){
+    return 0;
+  }
+
+  if (E >= 23){
+    frac <<= (E - 23);
+  } else {
+    frac >>= (23 - E);
+  }
+
+  if(s)
+    return ~frac +1;
+
+  return frac;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -384,5 +448,24 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  /**
+   * 看指数后能表示的范围，最小最大，否则NaN或者inf
+   * 得到各种的参数范围
+  */
+
+  if (x < -149){
+    return 0;
+  } else if(x < -126){
+    //denormalize
+    //E = x
+    //E = 1- 127 = -126
+    int shift = 23 - (x + 126);
+    return 1 << shift;
+  }else if(x <= 127){
+    int expr = x + 127;
+    return expr << 23;
+  }else {
+    return (0xff) << 23;  //inf
+  }
+  
 }
